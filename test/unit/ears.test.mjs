@@ -26,4 +26,13 @@ test('the mic helper hears the loudest input channel, steadily, and never a loop
   assert.equal(r.moved.heard.at(-1), 3);
   assert.ok(r.moved.heard.indexOf(3) <= 24, 'and within a few buffers');
   assert.deepEqual(r.allSkipped.heard, [1], 'everything skipped: still the loudest');
+  assert.ok(all(r.silent, 0) && r.silent.switches === 0, 'every input silent: stays on input 1');
+
+  const near = (a, b) => Math.abs(a - b) <= b * 1e-3;
+  for (const [k, what] of [['levelInterface', 'a tone on input 1 of 26'], ['levelSecond', 'a tone on input 2 of 26'], ['levelStereo', 'a tone on one side of an interleaved stereo input'], ['levelMono', 'a mono input']]) {
+    assert.ok(near(r[k].heard, r[k].input), `${what} is heard at its own level (${r[k].heard} vs ${r[k].input})`);
+  }
+  assert.ok(20 * Math.log10(r.levelInterface.heard / r.levelInterface.average) > 28, 'not the average of all 26, which is about 28 dB quieter');
+  assert.equal(r.levelSecond.channel, 1);
+  assert.equal(r.levelSilent.heard, 0, 'every input silent: silence, not noise or NaN');
 });

@@ -390,7 +390,7 @@ final class Ears: NSObject {
         picker = ChannelPicker()
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             guard let self, !self.muted else { return }
-            let b = Self.monoCopy(buffer, to: mono, picker: &self.picker, skip: skip)
+            let b = self.picker.monoCopy(buffer, to: mono, skip: skip)
             let level = Self.rms(b)
             if self.pcmOn { self.pushPCM(b) }
             self.hear(b, level: level)
@@ -565,29 +565,6 @@ final class Ears: NSObject {
     }
 
     // MARK: helpers
-
-    /// The loudest input channel as mono (see ChannelPicker), fading across the buffer where it switches.
-    static func monoCopy(_ buffer: AVAudioPCMBuffer, to mono: AVAudioFormat, picker: inout ChannelPicker, skip: Set<Int>) -> AVAudioPCMBuffer {
-        let channels = Int(buffer.format.channelCount)
-        guard channels > 1, let src = buffer.floatChannelData,
-              let out = AVAudioPCMBuffer(pcmFormat: mono, frameCapacity: buffer.frameLength),
-              let dst = out.floatChannelData else { return buffer }
-        let n = Int(buffer.frameLength)
-        out.frameLength = buffer.frameLength
-        guard n > 0 else { return out }
-        let interleaved = buffer.format.isInterleaved
-        let at = { (c: Int, i: Int) -> Float in interleaved ? src[0][i * channels + c] : src[c][i] }
-        var power = [Float](repeating: 0, count: channels)
-        for c in 0..<channels { var s: Float = 0; for i in 0..<n { let v = at(c, i); s += v * v }; power[c] = s / Float(n) }
-        let (from, to) = picker.pick(power, skip: skip)
-        if from == to {
-            for i in 0..<n { dst[0][i] = at(to, i) }
-        } else {
-            let step = 1 / Float(n)
-            for i in 0..<n { let t = Float(i) * step; dst[0][i] = at(from, i) * (1 - t) + at(to, i) * t }
-        }
-        return out
-    }
 
     static func rms(_ buffer: AVAudioPCMBuffer) -> Float {
         guard let ch = buffer.floatChannelData?[0] else { return 0 }
