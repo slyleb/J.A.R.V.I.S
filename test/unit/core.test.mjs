@@ -87,6 +87,20 @@ test('wake phrases are recognised', () => {
   assert.ok(!isCommand('can you mute the music', STANDBY_PHRASES));
 });
 
+test('French wake and sleep phrases are recognised, with or without accents', () => {
+  assert.ok(matches('Jarvis, réveille-toi', WAKE_PHRASES));
+  assert.ok(matches('reveille-toi', WAKE_PHRASES));
+  assert.ok(matches('Réveille toi Jarvis', WAKE_PHRASES));
+  assert.ok(!matches('quelle heure est-il', WAKE_PHRASES));
+  assert.ok(isCommand('Jarvis, bonne nuit.', SLEEP_PHRASES));
+  assert.ok(isCommand('dors', SLEEP_PHRASES));
+  assert.ok(isCommand('Arrête d’écouter, merci', SLEEP_PHRASES));
+  assert.ok(isCommand('ok ce sera tout merci', SLEEP_PHRASES));
+  assert.ok(!isCommand("je n'ai pas bien dormi", SLEEP_PHRASES));
+  assert.ok(!isCommand('il dort dans sa chambre', SLEEP_PHRASES));
+  assert.ok(matches('jarvis wake up', WAKE_PHRASES));
+});
+
 test('config sanitising replaces junk with defaults', () => {
   const c = C.sanitize({ ...C.DEFAULTS, effort: 'turbo', commandSilenceSeconds: -7, checkIns: 'always', ollamaUrl: 'ftp://x' });
   assert.equal(c.effort, C.DEFAULTS.effort);

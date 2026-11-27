@@ -10,23 +10,30 @@
 const EventEmitter = require('events');
 const { log } = require('./util');
 
-const WAKE_PHRASES = ['wake up', 'wakeup', 'wake', 'back up', 'backup', 'wake-up', 'walk up', 'make up', 'makeup', 'wake-up call', 'wakey', 'start listening', 'listen up', 'are you awake', 'you up'];
-const SLEEP_PHRASES = ['sleep', 'go to sleep', 'sleep now', 'stop listening', 'that will be all', "that'll be all", 'dismissed'];
+const WAKE_PHRASES = ['wake up', 'wakeup', 'wake', 'back up', 'backup', 'wake-up', 'walk up', 'make up', 'makeup', 'wake-up call', 'wakey', 'start listening', 'listen up', 'are you awake', 'you up',
+  // French, written without accents: fold() strips them from what was heard.
+  'reveille-toi', 'reveille toi', 'reveille', 'reveille-toe', 'debout', 'ecoute-moi', 'ecoute moi'];
+const SLEEP_PHRASES = ['sleep', 'go to sleep', 'sleep now', 'stop listening', 'that will be all', "that'll be all", 'dismissed',
+  'dors', 'va dormir', 'va te coucher', 'bonne nuit', "arrete d'ecouter", 'arrete d ecouter', 'ce sera tout'];
 const STANDBY_PHRASES = ['standby', 'stand by', 'go to standby', 'on standby', 'mute', 'mute yourself'];
 // Said on their own, these act without "over".
 const CONTROL_WORDS = new Set([...SLEEP_PHRASES, ...STANDBY_PHRASES, 'stop', 'wait', 'cancel', 'hold on', 'never mind', 'shut up', 'quiet', 'enough']);
 const HANGING = new Set(['and', 'or', 'but', 'so', 'then', 'like', 'um', 'uh', 'to', 'the', 'a', 'an', 'of', 'for', 'with', 'in', 'on', 'at', 'is', 'are', 'can', 'could', 'please', 'i', 'you', 'it', 'that', 'this', 'my', 'me', 'if', 'when', 'also', 'just', 'okay', 'ok']);
+
+/** "Réveille-toi" → "reveille-toi": the phrase lists are plain ASCII, and \w doesn't match accented letters. */
+const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u2019/g, "'");
 
 const PUNCT = /[\s.,!?;:'"()\-]+/g;
 const trimPunct = (s) => s.replace(/^[\s.,!?;:'"()\-]+|[\s.,!?;:'"()\-]+$/g, '');
 
 /** "make up, but…" → matches "make up". Phrase equal, prefix or suffix. */
 function matches(text, phrases) {
-  const t = text.toLowerCase().replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(Boolean).join(' ');
+  const t = fold(text).toLowerCase().replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(Boolean).join(' ');
   return phrases.some((p) => t === p || t.startsWith(p + ' ') || t.endsWith(' ' + p));
 }
 
-const FILLER = new Set(['jarvis', 'friday', 'karen', 'edith', 'vision', 'please', 'now', 'ok', 'okay', 'alright', 'thanks', 'thank', 'you']);
+const FILLER = new Set(['jarvis', 'friday', 'karen', 'edith', 'vision', 'please', 'now', 'ok', 'okay', 'alright', 'thanks', 'thank', 'you',
+  'merci', 'maintenant', 'stp', 'allez', 'bon']);
 
 /**
  * Is this utterance the command? The whole utterance can be the phrase, give or take "Jarvis", "please",
@@ -34,7 +41,7 @@ const FILLER = new Set(['jarvis', 'friday', 'karen', 'edith', 'vision', 'please'
  * sleep"), but a single word only counts on its own, so "I couldn't sleep" doesn't put JARVIS to sleep.
  */
 function isCommand(text, phrases) {
-  const words = text.toLowerCase().replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(Boolean);
+  const words = fold(text).toLowerCase().replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(Boolean);
   let a = 0, b = words.length;
   while (a < b && FILLER.has(words[a])) a++;
   while (b > a && FILLER.has(words[b - 1])) b--;
