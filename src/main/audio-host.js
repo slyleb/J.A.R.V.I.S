@@ -44,7 +44,8 @@ class AudioHost extends EventEmitter {
   playMusic(url, volume) { this.send({ type: 'music-play', url, volume }); }
   stopMusic() { this.send({ type: 'music-stop' }); }
   setMusicVolume(v) { this.send({ type: 'music-volume', v }); }
-  chime() { this.send({ type: 'chime' }); }
+  /** soft: the quiet one that says JARVIS is listening again. */
+  chime(soft = false) { this.send({ type: 'chime', soft }); }
 }
 
 module.exports = AudioHost;

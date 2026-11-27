@@ -67,17 +67,19 @@ function stopMusic() {
   music.load();
 }
 
-// Short two-tone chime when JARVIS wakes.
-function chime() {
+// Short two-tone chime when JARVIS wakes. soft: the quieter, quicker one when he listens again
+// (over in about 0.2 s, inside the 0.4 s after his voice that the listener throws away).
+function chime(soft) {
   const t = ctx.currentTime;
-  for (const [f, d] of [[880, 0], [1320, 0.09]]) {
+  const [peak, gap, len] = soft ? [0.05, 0.05, 0.12] : [0.18, 0.09, 0.22];
+  for (const [f, d] of [[880, 0], [1320, gap]]) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.value = f;
     g.gain.setValueAtTime(0.0001, t + d);
-    g.gain.exponentialRampToValueAtTime(0.18, t + d + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.22);
+    g.gain.exponentialRampToValueAtTime(peak, t + d + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d + len);
     o.connect(g).connect(ctx.destination);
-    o.start(t + d); o.stop(t + d + 0.25);
+    o.start(t + d); o.stop(t + d + len + 0.03);
   }
 }
 
@@ -89,6 +91,6 @@ host.on((msg) => {
     case 'music-play': playMusic(msg.url, msg.volume); break;
     case 'music-stop': stopMusic(); break;
     case 'music-volume': music.volume = Math.max(0, Math.min(1, msg.v)); break;
-    case 'chime': chime(); break;
+    case 'chime': chime(msg.soft); break;
   }
 });

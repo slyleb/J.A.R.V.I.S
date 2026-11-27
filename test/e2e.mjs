@@ -749,6 +749,12 @@ async function testHud() {
   await hud.click('.tog:has([data-key="requireEndWord"])');
   await sleep(500);
   check('"over" toggle off again', s.config().requireEndWord === false);
+  check('listening chime toggle starts on', await hud.isChecked('[data-key="listenChime"]'));
+  await hud.click('.tog:has([data-key="listenChime"])');
+  await sleep(500);
+  check('listening chime turned off and saved', s.config().listenChime === false);
+  await hud.click('.tog:has([data-key="listenChime"])');
+  await sleep(500);
   m = s.mark();
   await setField('appleSpeech', 'accurate');
   check('recogniser change restarts the speech sidecar', await s.waitLog(/settings: applied appleSpeech[\s\S]*ears: ready/, 8000, m));

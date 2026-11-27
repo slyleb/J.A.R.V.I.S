@@ -179,11 +179,14 @@ class Orchestrator extends EventEmitter {
 
     speaker.on('start', () => { wake.jarvisSpeaking = true; this.state = 'speaking'; });
     speaker.on('level', (l) => { if (hud.visible !== false) hud.send('voice', { level: l }); });
-    speaker.on('finish', () => {
+    speaker.on('finish', (stopped) => {
       // Small grace so the tail of his own voice isn't taken as the user's.
       setTimeout(() => { wake.jarvisSpeaking = false; }, 400);
       this.lastSpokeAt = Date.now();
       if (this._state === 'listening') return;       // barged in
+      // Done talking and listening for the user again: a soft chime says so. It is over before the
+      // grace ends, so the listener throws it away with the tail of his voice.
+      if (this.cfg.listenChime && !stopped && this.awake && !this.brain.isBusy && !this.pendingCommand && !this.muted && !this.disabled) this.audio.chime(true);
       if (!this.brain.isBusy) this.finishedTurn(); else this.state = 'thinking';
     });
 
