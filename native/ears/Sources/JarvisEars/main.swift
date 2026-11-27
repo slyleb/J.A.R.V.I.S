@@ -109,6 +109,20 @@ enum AudioDevices {
         return list.reduce(0) { $0 + Int($1.mNumberChannels) }
     }
 
+    /// The names of a device's input channels, in order ("Input 1", "Loop 1"…); empty if it names none.
+    static func inputChannelNames(_ id: AudioDeviceID) -> [String] {
+        let n = inputChannels(id)
+        guard n > 0 else { return [] }
+        let names: [String] = (1...n).map { c in
+            var addr = AudioObjectPropertyAddress(mSelector: kAudioObjectPropertyElementName, mScope: kAudioObjectPropertyScopeInput, mElement: UInt32(c))
+            var name: CFString = "" as CFString
+            var size = UInt32(MemoryLayout<CFString>.size)
+            let status = withUnsafeMutablePointer(to: &name) { AudioObjectGetPropertyData(id, &addr, 0, nil, &size, $0) }
+            return status == noErr ? (name as String) : ""
+        }
+        return names.allSatisfy { $0.isEmpty } ? [] : names
+    }
+
     static func emitList() {
         let d = defaultInput()
         emit(["type": "devices", "list": inputDevices().map { ["id": Int($0.id), "name": $0.name, "default": $0.id == d] }])
@@ -263,6 +277,8 @@ final class Ears: NSObject {
     private var echoOn = true
     private var preroll: [AVAudioPCMBuffer] = []
     private var prerollFrames: AVAudioFrameCount = 0
+    // Which input channel is heard (see ChannelPicker). Used from the audio thread only.
+    private var picker = ChannelPicker()
 
     override init() {
         super.init()
@@ -364,10 +380,17 @@ final class Ears: NSObject {
         } catch { log("voice processing unavailable: \(error)") }
         let format = input.outputFormat(forBus: 0)
         let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: format.sampleRate, channels: 1, interleaved: false)!
+        // Loopback inputs carry what the Mac plays (his voice, the music): never the one to listen to.
+        // Echo cancellation hands back its own channels (the cleaned voice on each), which the names
+        // don't describe, so they are only used when the counts match.
+        let names = AudioDevices.inputChannelNames(AudioDevices.defaultInput())
+        let skip = names.count == Int(format.channelCount)
+            ? Set(names.indices.filter { names[$0].localizedCaseInsensitiveContains("loop") }) : []
         input.removeTap(onBus: 0)
+        picker = ChannelPicker()
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             guard let self, !self.muted else { return }
-            let b = Self.monoCopy(buffer, to: mono)
+            let b = Self.monoCopy(buffer, to: mono, picker: &self.picker, skip: skip)
             let level = Self.rms(b)
             if self.pcmOn { self.pushPCM(b) }
             self.hear(b, level: level)
@@ -543,18 +566,25 @@ final class Ears: NSObject {
 
     // MARK: helpers
 
-    static func monoCopy(_ buffer: AVAudioPCMBuffer, to mono: AVAudioFormat) -> AVAudioPCMBuffer {
+    /// The loudest input channel as mono (see ChannelPicker), fading across the buffer where it switches.
+    static func monoCopy(_ buffer: AVAudioPCMBuffer, to mono: AVAudioFormat, picker: inout ChannelPicker, skip: Set<Int>) -> AVAudioPCMBuffer {
         let channels = Int(buffer.format.channelCount)
         guard channels > 1, let src = buffer.floatChannelData,
               let out = AVAudioPCMBuffer(pcmFormat: mono, frameCapacity: buffer.frameLength),
               let dst = out.floatChannelData else { return buffer }
         let n = Int(buffer.frameLength)
         out.frameLength = buffer.frameLength
-        let scale = 1 / Float(channels)
-        if buffer.format.isInterleaved {
-            for i in 0..<n { var s: Float = 0; for c in 0..<channels { s += src[0][i * channels + c] }; dst[0][i] = s * scale }
+        guard n > 0 else { return out }
+        let interleaved = buffer.format.isInterleaved
+        let at = { (c: Int, i: Int) -> Float in interleaved ? src[0][i * channels + c] : src[c][i] }
+        var power = [Float](repeating: 0, count: channels)
+        for c in 0..<channels { var s: Float = 0; for i in 0..<n { let v = at(c, i); s += v * v }; power[c] = s / Float(n) }
+        let (from, to) = picker.pick(power, skip: skip)
+        if from == to {
+            for i in 0..<n { dst[0][i] = at(to, i) }
         } else {
-            for i in 0..<n { var s: Float = 0; for c in 0..<channels { s += src[c][i] }; dst[0][i] = s * scale }
+            let step = 1 / Float(n)
+            for i in 0..<n { let t = Float(i) * step; dst[0][i] = at(from, i) * (1 - t) + at(to, i) * t }
         }
         return out
     }

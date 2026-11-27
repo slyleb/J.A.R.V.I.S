@@ -225,7 +225,7 @@ class Speaker extends EventEmitter {
   finishedOne(stopped) {
     this.playing = false;
     if (stopped || (!this.queue.length && !this.inflight.size)) {
-      if (this.started) { this.started = false; this.emit('level', 0); this.emit('finish'); }
+      if (this.started) { this.started = false; this.emit('level', 0); this.emit('finish', !!stopped); }
     } else {
       this.pump();
     }

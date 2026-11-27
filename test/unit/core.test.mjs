@@ -273,6 +273,34 @@ test('a running job shows its progress on the HUD but is never announced until i
   assert.equal(notices.at(-1), 'Finished: checking your Gmail');
 });
 
+test('a soft chime says JARVIS listens again, only once he finished talking on his own, inside the grace the listener drops', (t) => {
+  const { Orchestrator } = require('../../src/main/orchestrator');
+  const EventEmitter = require('node:events');
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const em = (extra) => Object.assign(new EventEmitter(), extra);
+  const chimes = [];
+  const o = Object.assign(Object.create(Orchestrator.prototype), {
+    cfg: { ...C.DEFAULTS }, brain: { isBusy: false }, speaker: em(), wake: em({ conversationMode: true, jarvisSpeaking: false }),
+    ears: em(), radar: em(), monitor: em(), inbox: em(), memory: em(), scheduler: em(), music: em({ duck() {} }), youtube: em({ duck() {} }),
+    hud: em({ send() {}, sendRaw() {} }), audio: { chime: (soft) => chimes.push({ soft, speaking: o.wake.jarvisSpeaking }) },
+    _state: 'speaking', muted: false, disabled: false, pendingCommand: null,
+    wireBrain() {}, finishedTurn() {},
+  });
+  o.wire();
+  const finish = (stopped = false) => { o._state = 'speaking'; o.wake.jarvisSpeaking = true; o.speaker.emit('finish', stopped); t.mock.timers.tick(400); };
+  finish();
+  assert.deepEqual(chimes, [{ soft: true, speaking: true }], 'soft, and while what the mic hears is still thrown away');
+  assert.equal(o.wake.jarvisSpeaking, false);
+  finish(true);
+  assert.equal(chimes.length, 1, 'not when he was cut off');
+  o.brain.isBusy = true; finish(); o.brain.isBusy = false;
+  assert.equal(chimes.length, 1, 'not while more is coming');
+  o.wake.conversationMode = false; finish(); o.wake.conversationMode = true;
+  assert.equal(chimes.length, 1, 'not while asleep');
+  o.cfg.listenChime = false; finish();
+  assert.equal(chimes.length, 1, 'not when turned off');
+});
+
 test('findClaude() finds claude in its install locations when PATH lacks it', (t) => {
   if (['/opt/homebrew/bin/claude', '/usr/local/bin/claude'].some((p) => fs.existsSync(p))) return t.skip('claude is installed system-wide here');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-home-'));

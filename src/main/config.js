@@ -49,6 +49,7 @@ const DEFAULTS = {
   endWords: ['over', 'over and out'],
   requireEndWord: false,
   echoCancel: 'auto',             // auto: only while JARVIS talks or music plays (saves about a quarter of a core) | always
+  listenChime: true,              // a soft chime when JARVIS finishes speaking and listens again
 
   // Mouth
   ttsEngine: 'kokoro',            // kokoro | elevenlabs | edge | native
