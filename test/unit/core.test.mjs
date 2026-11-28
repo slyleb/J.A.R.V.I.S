@@ -329,6 +329,7 @@ test('awake with no command for awakeIdleSeconds, JARVIS goes back to sleep (the
   assert.equal(tick(1000 + 61000), false);            // busy: never cut off
   self._state = 'idle'; self.lastSpokeAt = 30000;
   assert.equal(tick(1000 + 61000), false);            // it spoke 32 s ago
+  self.muted = true;
   assert.equal(tick(30000 + 60000), true);            // a minute after it last spoke
   assert.equal(conv, false);
   assert.deepEqual(sent.at(-1), ['mode', { conversation: false }]);
