@@ -140,6 +140,13 @@ class Music extends EventEmitter {
       this.index = builtIn;
       if (await new Promise((r) => this.play(undefined, r))) return this.stations[builtIn].name;
     }
+    // A station the user already has ("mets le 98.5", "mets CHOM"): by name, before the directory.
+    const words = query.toLowerCase().replace(/\b(?:radio|fm|station|le|la|les|the|au)\b/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const mine = words.length ? this.favourites.findIndex((s) => words.every((w) => s.name.toLowerCase().includes(w))) : -1;
+    if (mine >= 0) {
+      this.index = this.stations.findIndex((s) => s.id === this.favourites[mine].id);
+      if (this.index >= 0 && await new Promise((r) => this.play(undefined, r))) return this.stations[this.index].name;
+    }
     const q = encodeURIComponent(query);
     let found = await rbFetch(`${RB}/search?name=${q}&countrycode=${this.cfg.radioCountry}&order=votes&reverse=true&limit=8&hidebroken=true`);
     if (!found.length) found = await rbFetch(`${RB}/search?name=${q}&order=votes&reverse=true&limit=8&hidebroken=true`);
