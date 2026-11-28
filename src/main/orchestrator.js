@@ -550,6 +550,7 @@ class Orchestrator extends EventEmitter {
     this.hud.sendRaw('schedule', this.scheduler.items);
     if (this.brain.contextInfo) this.hud.sendRaw('context', this.brain.contextInfo());
     setInterval(() => this.checkInTick(), Number(process.env.JARVIS_TEST_CHECKIN_TICK_MS) || 60000);
+    setInterval(() => this.idleSleepTick(), 5000).unref();
     this.voiceOn = withVoice;
     if (withVoice) this.ears.start();
     else { this.state = 'idle'; this.hud.send('boot', { ok: true }); }
@@ -662,6 +663,7 @@ class Orchestrator extends EventEmitter {
   handle(raw, source) {
     const command = String(raw || '').trim();
     if (!command) return;
+    if (source.kind === 'voice') this.lastCommandAt = Date.now();
     if (this.disabled && source.kind === 'voice') return;
     // Asleep: by voice only "wake up" (and standby) is accepted.
     if (source.kind === 'voice' && !this.awake) {
@@ -991,6 +993,20 @@ class Orchestrator extends EventEmitter {
     if (isCommand(t, STANDBY_PHRASES)) return () => this.setStandby(true);
     if (t.includes('full screen') || t.includes('fullscreen')) return () => { this.hud.toggleFullScreen(); done(); };
     return null;
+  }
+
+  /** Awake with no command for awakeIdleSeconds (and nothing being said or thought): back to sleep.
+   *  While awake everything heard may be streamed to the cloud transcriber, which costs credits. */
+  idleSleepTick(now = Date.now()) {
+    const limit = (this.cfg.awakeIdleSeconds || 0) * 1000;
+    if (!limit || !this.awake || this.disabled || this.muted) return false;
+    // Busy, or a background job is still running (the user is waiting for its result): stay awake.
+    if (['thinking', 'speaking'].includes(this._state) || this.brain.isBusy || this.speaker.isSpeaking || this.pendingCommand || this.progress?.size) return false;
+    if (now - Math.max(this.lastCommandAt || 0, this.lastSpokeAt || 0) < limit) return false;
+    log(`listener: no command for ${this.cfg.awakeIdleSeconds} s, back to sleep`);
+    this.wake.setConversation(false);
+    this.hud.send('mode', { conversation: false });
+    return true;
   }
 
   shutdown() {
