@@ -66,6 +66,8 @@ function radioQuery(input) {
 const FR_PLAY = '(?:mets|met|mettre|joue|jouer|fais jouer|faire jouer|lance|lancer|pars|part|partir|envoie|envoye|envoyer|allume|allumer|ouvre|ouvrir)(?: moi| nous)?';
 const FR_VOLUME = '(?:un peu )?(?:le (?:volume|son) (?:de la |du |de )?)?(?:la )?(?:musique|radio)(?: un peu)?';
 const FR_MUSIC = [
+  // "mets de la musique lo-fi", "joue du jazz", "mets de la musique classique" → the built-in station of that kind.
+  [new RegExp(`^${FR_PLAY} (?:de la |d'la |un peu de |du |de )?(?:musique |radio )?(lo ?fi|jazz|classique|classical|chill ?hop|chill|ambiance|ambient|lounge)$`), (g) => `play ${g} radio`],
   [new RegExp(`^(?:monte|monter|remonte|remonter|augmente|augmenter|hausse|hausser) ${FR_VOLUME}$`), 'music louder'],
   [new RegExp(`^(?:baisse|baisser|diminue|diminuer|descends|descend|descendre|reduis|reduire) ${FR_VOLUME}$`), 'music quieter'],
   [/^(?:(?:mets|met|mettre) )?(?:la )?(?:musique|radio) (?:un peu )?plus fort(?:e)?$/, 'music louder'],

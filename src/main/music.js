@@ -132,6 +132,14 @@ class Music extends EventEmitter {
 
   /** "play radio mirchi" → search, try matches until one plays, remember it. */
   async playSearch(query) {
+    // A kind of music ("lofi", "jazz", "classique") plays the built-in station of that kind.
+    const kind = { lofi: 'lofi', jazz: 'smoothjazz', classique: 'classical', classical: 'classical', classic: 'classical',
+      chillhop: 'chillhop', chill: 'chillhop', ambiance: 'ambient', ambient: 'ambient', lounge: 'lounge' }[query.toLowerCase().replace(/\bradio\b|[^a-z]/g, '')];
+    const builtIn = kind && this.stations.findIndex((s) => s.id === kind);
+    if (builtIn >= 0) {
+      this.index = builtIn;
+      if (await new Promise((r) => this.play(undefined, r))) return this.stations[builtIn].name;
+    }
     const q = encodeURIComponent(query);
     let found = await rbFetch(`${RB}/search?name=${q}&countrycode=${this.cfg.radioCountry}&order=votes&reverse=true&limit=8&hidebroken=true`);
     if (!found.length) found = await rbFetch(`${RB}/search?name=${q}&order=votes&reverse=true&limit=8&hidebroken=true`);
