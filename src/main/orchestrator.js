@@ -86,7 +86,7 @@ const FR_MUSIC = [
   }],
   // "mets la radio CKOI", "mets le poste Rouge FM" → the name; "mets CKOI FM", "joue Radio-Canada", "mets 98,5".
   [new RegExp(`^${FR_PLAY} (?:la |le |sur la |sur le |a la |au )(?:radio|station|poste) (?:de |du )?(.+)$`), (q) => `play ${q} radio station`],
-  [new RegExp(`^${FR_PLAY} (.+)$`), (q) => (/\b(?:fm|radio)\b/.test(q) || /^(?:le |la |au )?\d{2,3}(?:\.\d)?$/.test(q) ? `play ${q.replace(/^(?:le|la|au) /, '')} radio` : null)],
+  [new RegExp(`^${FR_PLAY} (.+)$`), (q) => (/\b(?:fm|radio)\b/.test(q) || /^(?:le |la |au )?\d{2,3}(?:\.\d)?$/.test(q) ? `play ${q.replace(/^(?:le|la|au) /, '')}${/\b(?:fm|radio)\b/.test(q) ? '' : ' radio'}` : null)],
 ];
 
 function frenchMusic(input) {
