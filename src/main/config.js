@@ -46,6 +46,7 @@ const DEFAULTS = {
 
   // Ears
   sttEngine: 'apple',             // apple (on-device) | elevenlabs (Scribe realtime)
+  scribeLanguage: 'locale',       // Scribe: locale (speechLocale's language) | auto (detects it per sentence: talk French or English)
   speechLocale: 'en-US',
   appleSpeech: 'instant',         // instant (classic dictation, word by word) | accurate (SpeechAnalyzer, ~1 s updates)
   commandSilenceSeconds: 3.0,
@@ -157,6 +158,7 @@ function load(asId) {
 const ENUMS = {
   brainProvider: ['auto', 'claude-code', 'anthropic', 'gemini', 'ollama'],
   sttEngine: ['apple', 'elevenlabs'],
+  scribeLanguage: ['locale', 'auto'],
   appleSpeech: ['instant', 'accurate'],
   echoCancel: ['auto', 'always'],
   ttsEngine: ['kokoro', 'elevenlabs', 'edge', 'native'],
