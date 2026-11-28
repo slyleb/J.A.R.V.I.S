@@ -26,9 +26,10 @@ const { memoryEnv } = require('../memory');
 const { SentenceSplitter, systemPrompt, workerPrompt, summarise, claudeSettings, claudeExtras, claudeDisallowed } = require('./common');
 
 const ENDED = new Set(['completed', 'failed', 'killed', 'stopped', 'cancelled']);
-// A fresh brain starts at about 23k tokens (prompt, tools, worker); this leaves about 17k for the conversation.
-// Replies slowed from 1-2.5 s to about 5 s well before 70k, so it rolls at 40k like the API brains.
-const ROLL_TOKENS = 40000;
+// A fresh brain with skills, MCP tools and the carried summary measured about 41k tokens after one turn
+// (2026-11-27), so 40k rolled over after every question. 60k leaves about 20k for the conversation;
+// replies slowed to about 5 s near 70k.
+const ROLL_TOKENS = 60000;
 const RETRY_MS = 10 * 60 * 1000;
 
 /** "Running mcp__claude-in-chrome__navigate" → "navigate in Chrome"; "Running List files" → "List files". */
