@@ -310,6 +310,32 @@ test('a sentence Scribe has ended is sent at once; on-device text still waits fo
   clearTimeout(w.timer);
 });
 
+test('awake with no command for awakeIdleSeconds, JARVIS goes back to sleep (the cloud transcriber stops)', () => {
+  const { Orchestrator } = require('../../src/main/orchestrator');
+  const sent = [];
+  let conv = true;
+  const self = {
+    cfg: { awakeIdleSeconds: 60 }, _state: 'idle', disabled: false, muted: false, pendingCommand: null,
+    brain: { isBusy: false }, speaker: { isSpeaking: false }, hud: { send: (t, d) => sent.push([t, d]) },
+    wake: { setConversation: (on) => { conv = on; } }, get awake() { return conv; },
+    lastCommandAt: 1000, lastSpokeAt: 0,
+  };
+  const tick = (now) => Orchestrator.prototype.idleSleepTick.call(self, now);
+  assert.equal(tick(1000 + 59000), false);            // 59 s: still awake
+  self.progress = new Map([['j1', {}]]);
+  assert.equal(tick(1000 + 61000), false);            // a background job is running
+  self.progress = new Map();
+  self._state = 'thinking';
+  assert.equal(tick(1000 + 61000), false);            // busy: never cut off
+  self._state = 'idle'; self.lastSpokeAt = 30000;
+  assert.equal(tick(1000 + 61000), false);            // it spoke 32 s ago
+  assert.equal(tick(30000 + 60000), true);            // a minute after it last spoke
+  assert.equal(conv, false);
+  assert.deepEqual(sent.at(-1), ['mode', { conversation: false }]);
+  self.cfg.awakeIdleSeconds = 0; conv = true;
+  assert.equal(tick(10e9), false);                    // 0 = never
+});
+
 test('the user can make their own assistant and rewrite any persona', () => {
   const { allAssistants, findByName, newId, assistantOf } = require('../../src/main/assistants');
   fs.writeFileSync(C.CONFIG_FILE, JSON.stringify({ onboarded: true }));

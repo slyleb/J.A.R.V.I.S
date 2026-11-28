@@ -46,6 +46,7 @@ const DEFAULTS = {
 
   // Ears
   sttEngine: 'apple',             // apple (on-device) | elevenlabs (Scribe realtime)
+  awakeIdleSeconds: 60,          // awake but no command for this long: back to sleep, so the cloud transcriber stops (0 = never)
   scribeLanguage: 'locale',       // Scribe: locale (speechLocale's language) | auto (detects it per sentence: talk French or English)
   speechLocale: 'en-US',
   appleSpeech: 'instant',         // instant (classic dictation, word by word) | accurate (SpeechAnalyzer, ~1 s updates)
@@ -170,7 +171,7 @@ const ENUMS = {
   themeMode: ['dark', 'light', 'system'],
 };
 const RANGES = {
-  commandSilenceSeconds: [0.5, 15], pauseGraceSeconds: [1, 30], kokoroSpeed: [0.5, 2],
+  commandSilenceSeconds: [0.5, 15], awakeIdleSeconds: [0, 3600], pauseGraceSeconds: [1, 30], kokoroSpeed: [0.5, 2],
   musicVolume: [0, 1], voiceVolume: [0, 1], maxSpokenSentences: [1, 999],
   desktopOpacity: [0, 100], desktopBlur: [0, 100],
 };
