@@ -130,10 +130,13 @@ class Ears extends EventEmitter {
       if (!r.ok) throw new Error(`token ${r.status} ${(await r.text()).slice(0, 120)}`);
       const { token } = await r.json();
       if (!this.cloudWanted) return;
+      // Scribe ends a sentence after JARVIS's own command silence, and the listener sends it on that
+      // commit, so the two waits don't add up. No language_code: Scribe detects it per sentence.
       const q = new URLSearchParams({
         model_id: 'scribe_v2_realtime', audio_format: 'pcm_16000', commit_strategy: 'vad',
-        language_code: this.cfg.speechLocale.split('-')[0], token,
+        vad_silence_threshold_secs: String(Math.min(3, Math.max(0.3, this.cfg.commandSilenceSeconds))), token,
       });
+      if (this.cfg.scribeLanguage !== 'auto') q.set('language_code', this.cfg.speechLocale.split('-')[0]);
       const ws = new WebSocket(`wss://api.elevenlabs.io/v1/speech-to-text/realtime?${q}`);
       this.ws = ws;
       this.cloud = { committed: '', partial: '', dropUntilCommit: false };
@@ -183,7 +186,7 @@ class Ears extends EventEmitter {
         return;
     }
     const text = [c.committed, c.partial].filter(Boolean).join(' ').trim();
-    if (text) this.emit('text', text, m.message_type === 'committed_transcript');
+    if (text) this.emit('text', text, m.message_type === 'committed_transcript', true);
   }
 }
 

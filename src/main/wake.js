@@ -70,7 +70,7 @@ class Wake extends EventEmitter {
     this.lastChange = Date.now();
     this.timer = null;
     this.setNames();
-    ears.on('text', (t, f) => this.handle(t, f));
+    ears.on('text', (t, f, cloud) => this.handle(t, f && cloud));
     ears.on('restarted', () => this.taskRestarted());
   }
 
@@ -166,7 +166,8 @@ class Wake extends EventEmitter {
     return before.length <= 1 && (!before.length || /^(hey|hi|ok|okay|hello|yo|so)\W*$/.test(before[0])) ? { end: m.index + m[0].length } : null;
   }
 
-  handle(text) {
+  /** committed: Scribe ended the sentence after its own silence wait (cloud only), so don't wait again. */
+  handle(text, committed = false) {
     if (this.muted) return;
     const fresh = text.toLowerCase();
     const lower = this.carry ? (fresh.trim() ? `${this.carry} ${fresh}` : this.carry) : fresh;
@@ -207,7 +208,7 @@ class Wake extends EventEmitter {
       this.restart();
       return;
     }
-    this.schedule(quickControl || stripEndWord(command, this.cfg.endWords) !== null);
+    this.schedule(quickControl || stripEndWord(command, this.cfg.endWords) !== null, committed);
   }
 
   commandText(lower) {
@@ -215,9 +216,9 @@ class Wake extends EventEmitter {
     return trimPunct(lower.slice(this.prefixLen));
   }
 
-  schedule(endWord = false) {
+  schedule(endWord = false, committed = false) {
     clearTimeout(this.timer);
-    const wait = endWord ? 0.6 : ((this.conversationMode && this.cfg.requireEndWord) ? 0.5 : this.cfg.commandSilenceSeconds);
+    const wait = endWord ? 0.6 : ((this.conversationMode && this.cfg.requireEndWord) ? 0.5 : committed ? 0.2 : this.cfg.commandSilenceSeconds);
     this.timer = setTimeout(() => this.silenceElapsed(), wait * 1000);
   }
 

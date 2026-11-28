@@ -288,6 +288,28 @@ test('while awake, the name only counts when the user addresses the assistant wi
   assert.ok(w.lastWake('blah blah friday stop'));
 });
 
+test('a sentence Scribe has ended is sent at once; on-device text still waits for the silence', async () => {
+  const EventEmitter = require('events');
+  const { Wake } = require('../../src/main/wake');
+  const ears = Object.assign(new EventEmitter(), { setAwake() {}, armed() {}, reset() {}, mute() {} });
+  const w = new Wake({ ...C.DEFAULTS, wakeWords: ['jarvis'], commandSilenceSeconds: 1.5 }, ears);
+  w.setConversation(true);
+  const got = [];
+  w.on('command', (c) => got.push([c, Date.now()]));
+  const t0 = Date.now();
+  ears.emit('text', 'play some music', true, true);          // Scribe commit
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(got.length, 1);
+  assert.equal(got[0][0], 'play some music');
+  assert.ok(got[0][1] - t0 < 500);
+  ears.emit('text', 'quelle heure est-il', true, false);         // on-device final: still waits
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(got.length, 1);
+  await new Promise((r) => setTimeout(r, 1200));
+  assert.equal(got.length, 2);
+  clearTimeout(w.timer);
+});
+
 test('the user can make their own assistant and rewrite any persona', () => {
   const { allAssistants, findByName, newId, assistantOf } = require('../../src/main/assistants');
   fs.writeFileSync(C.CONFIG_FILE, JSON.stringify({ onboarded: true }));
