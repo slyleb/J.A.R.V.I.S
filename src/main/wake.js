@@ -251,4 +251,4 @@ class Wake extends EventEmitter {
   }
 }
 
-module.exports = { Wake, matches, isCommand, WAKE_PHRASES, SLEEP_PHRASES, STANDBY_PHRASES, CONTROL_WORDS, PUNCT };
+module.exports = { Wake, matches, isCommand, fold, WAKE_PHRASES, SLEEP_PHRASES, STANDBY_PHRASES, CONTROL_WORDS, PUNCT };

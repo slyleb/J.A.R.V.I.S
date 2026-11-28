@@ -6,7 +6,7 @@ const path = require('path');
 const EventEmitter = require('events');
 const C = require('./config');
 const { log, run, clean, cutSources, SOURCES_START, paths, hhmm } = require('./util');
-const { Wake, matches, isCommand, WAKE_PHRASES, SLEEP_PHRASES, STANDBY_PHRASES } = require('./wake');
+const { Wake, matches, isCommand, fold, WAKE_PHRASES, SLEEP_PHRASES, STANDBY_PHRASES } = require('./wake');
 const Speaker = require('./speaker');
 const Music = require('./music');
 const YouTube = require('./youtube');
@@ -58,6 +58,46 @@ function radioQuery(input) {
   q = q.replace(/\s*\bfm\b\s*$/, '').trim();
   if (q === 'red' || q === 'big') q += ' fm';
   return q || null;
+}
+
+// Quebec French music commands → the English command they mean. The whole sentence has to be the command
+// (give or take "Jarvis", "euh" and "s'il te plaît"), so "je joue de la musique depuis dix ans" or
+// "mets la table" still go to the brain. Accents may be missing: speech-to-text often drops them.
+const FR_PLAY = '(?:mets|met|mettre|joue|jouer|fais jouer|faire jouer|lance|lancer|pars|part|partir|envoie|envoye|envoyer|allume|allumer|ouvre|ouvrir)(?: moi| nous)?';
+const FR_VOLUME = '(?:un peu )?(?:le (?:volume|son) (?:de la |du |de )?)?(?:la )?(?:musique|radio)(?: un peu)?';
+const FR_MUSIC = [
+  [new RegExp(`^(?:monte|monter|remonte|remonter|augmente|augmenter|hausse|hausser) ${FR_VOLUME}$`), 'music louder'],
+  [new RegExp(`^(?:baisse|baisser|diminue|diminuer|descends|descend|descendre|reduis|reduire) ${FR_VOLUME}$`), 'music quieter'],
+  [/^(?:(?:mets|met|mettre) )?(?:la )?(?:musique|radio) (?:un peu )?plus fort(?:e)?$/, 'music louder'],
+  [/^(?:(?:mets|met|mettre) )?(?:la )?(?:musique|radio) (?:un peu )?moins fort(?:e)?$/, 'music quieter'],
+  [/^(?:arrete|arreter|arretes|stoppe|stopper|coupe|couper|ferme|fermer|eteins|eteint|eteindre) (?:la |ta )?(?:musique|radio)$/, 'stop music'],
+  [/^(?:(?:mets|met|mettre) )?(?:la )?(?:musique|radio) (?:en|sur) pause$|^(?:(?:mets|met|mettre) )?(?:sur |en )?pause(?: (?:la )?(?:musique|radio))?$/, 'pause music'],
+  [/^(?:arrete|arreter|stoppe|stopper|coupe|couper|ferme|fermer) youtube$/, 'stop youtube'],
+  [/^(?:la )?(?:chanson|toune|piste) suivante$|^(?:(?:passe|passer) a )?(?:la )?prochaine (?:chanson|toune|piste)$|^(?:passe|passer|saute|sauter|skip|skippe|skipper|change|changer) (?:de |la |cette |a la )?(?:chanson|toune|piste)(?: suivante)?$/, 'next song'],
+  [/^(?:(?:mets|met|mettre) )?(?:la |le )?(?:station|poste|musique) suivante?$|^(?:(?:passe|passer) (?:a la |au ))?(?:la |le )?(?:prochaine station|prochain poste)$|^(?:change|changer|passe|passer) (?:de |la |a la |au )?(?:station|poste|musique)(?: suivante?)?$|^(?:(?:mets|met|mettre|joue|jouer) )?(?:une |un )?autre (?:musique|station|poste)$/, 'next station'],
+  [new RegExp(`^${FR_PLAY} (?:de la |d'la |la |un peu de |une |des )?(?:musique|toune|tounes|radio)(?: de fond| d'ambiance)?$|^(?:je veux|j'veux|j'aimerais|je voudrais) (?:de la |d'la |un peu de )?musique$`), 'play some music'],
+  // "joue du lofi sur YouTube" → "lofi". Not "mets ma vidéo sur YouTube" (an upload) or "lance une recherche sur YouTube".
+  [new RegExp(`^${FR_PLAY} (.+?) (?:sur|de|dans|a partir de) youtube$`), (q) => {
+    if (/^(?:ma|mon|mes|ta|ton|tes|sa|son|ses|notre|nos|votre|vos|ce|cet|cette|ces|ca|cela|ceci|le|la|les)$|^(?:ma|mon|mes|ta|ton|tes|sa|son|ses|notre|nos|votre|vos|ce|cet|cette|ces|ca|cela|ceci) |^(?:une |la )?recherche\b/.test(q)) return null;
+    q = q.replace(/^(?:un peu |de la |de l'|du |des |de |d'|le |la |les |l'|un |une )/, '');
+    return q ? `play ${q} on youtube` : null;
+  }],
+  // "mets la radio CKOI", "mets le poste Rouge FM" → the name; "mets CKOI FM", "joue Radio-Canada", "mets 98,5".
+  [new RegExp(`^${FR_PLAY} (?:la |le |sur la |sur le |a la |au )(?:radio|station|poste) (?:de |du )?(.+)$`), (q) => `play ${q} radio station`],
+  [new RegExp(`^${FR_PLAY} (.+)$`), (q) => (/\b(?:fm|radio)\b/.test(q) || /^\d{2,3}(?:\.\d)?$/.test(q) ? `play ${q}` : null)],
+];
+
+function frenchMusic(input) {
+  let t = fold(input).toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/-/g, ' ').replace(/\.(?!\d)|[^\w\s'.]/g, ' ')
+    .replace(/\b(?:euh+|heu+|hum+|hm+)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  t = t.replace(/^(?:(?:jarvis|friday|karen|edith|vision|ok|okay|bon|alors|allo|hey|eh|dis moi|dis|ben|bin) )+/, '')
+    .replace(/(?: (?:jarvis|friday|karen|edith|vision|s ?'? ?il (?:te|vous) pla[iy]t|svp|stp|merci|maintenant|tout de suite))+$/, '')
+    .replace(/^(?:est ce que )?(?:tu peux|peux tu|tu pourrais|pourrais tu|tu veux|veux tu)(?: me| nous)? /, '');
+  for (const [re, to] of FR_MUSIC) {
+    const m = re.exec(t);
+    if (m) return typeof to === 'function' ? to(m[1]) : to;
+  }
+  return null;
 }
 
 class Orchestrator extends EventEmitter {
@@ -913,10 +953,11 @@ class Orchestrator extends EventEmitter {
         done();
       };
     }
-    const yt = /^(?:play|put on|open)\s+(.+?)\s+(?:on|from)\s+youtube$/.exec(t);
+    const ask = frenchMusic(t) || t;   // "mets de la musique" → "play some music"
+    const yt = /^(?:play|put on|open)\s+(.+?)\s+(?:on|from)\s+youtube$/.exec(ask);
     if (yt) return () => { this.youtube.playQuery(yt[1]); this.speaker.speak(`Playing ${yt[1]} on YouTube, ${this.cfg.honorific}.`); done(); };
-    if (t.includes('stop youtube') || t.includes('close youtube')) return () => { this.youtube.stop(); done(); };
-    const rq = radioQuery(t);
+    if (ask.includes('stop youtube') || ask.includes('close youtube')) return () => { this.youtube.stop(); done(); };
+    const rq = radioQuery(ask);
     if (rq) {
       return async () => {
         const name = await this.music.playSearch(rq);
@@ -924,7 +965,7 @@ class Orchestrator extends EventEmitter {
         done();
       };
     }
-    const has = (list) => list.some((x) => t.includes(x));
+    const has = (list) => list.some((x) => ask.includes(x));
     if (has(['play music', 'play some music', 'music on', 'start music', 'turn on music', 'put on some music', 'play background music'])) return () => { this.music.play(); done(); };
     if (has(['stop music', 'stop the music', 'music off', 'turn off music', 'turn off the music', 'pause music', 'pause the music'])) return () => { this.music.stop(); done(); };
     const vol = (d) => () => { const v = Math.max(0.05, Math.min(1, this.music.baseVolume + d)); this.music.setVolume(v); this.youtube.setVolume(v); C.save({ musicVolume: v }); this.sendNowPlaying(); done(); };
@@ -959,4 +1000,4 @@ class Orchestrator extends EventEmitter {
   }
 }
 
-module.exports = { Orchestrator, radioQuery };
+module.exports = { Orchestrator, radioQuery, frenchMusic };

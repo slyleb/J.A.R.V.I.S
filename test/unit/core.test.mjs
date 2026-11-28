@@ -101,6 +101,50 @@ test('French wake and sleep phrases are recognised, with or without accents', ()
   assert.ok(matches('jarvis wake up', WAKE_PHRASES));
 });
 
+test('Quebec French music commands mean the English ones, with or without accents, "euh" or "s\'il te plaît"', () => {
+  const { frenchMusic } = require('../../src/main/orchestrator');
+  const said = {
+    'Mets de la musique': 'play some music', 'joue de la musique': 'play some music', 'Jarvis, euh, mets de la musique, s’il te plaît': 'play some music',
+    'mets de la musique sil te plait': 'play some music', 'mets-moi une toune': 'play some music', 'tu peux me mettre de la musique de fond': 'play some music',
+    'Joue du lofi sur YouTube': 'play lofi on youtube', 'mets du lofi sur youtube stp': 'play lofi on youtube', 'Ferme YouTube': 'stop youtube',
+    'Mets la radio Mirchi': 'play mirchi radio station', 'mets le poste CKOI': 'play ckoi radio station', 'Mets 98,5 FM': 'play 98.5 fm', 'joue Radio-Canada': 'play radio canada',
+    'Station suivante': 'next station', 'poste suivant': 'next station', 'change de station': 'next station', 'une autre musique': 'next station',
+    'Chanson suivante.': 'next song', 'passe à la chanson suivante': 'next song', 'prochaine toune': 'next song',
+    'Pause': 'pause music', 'mets la musique en pause': 'pause music', 'Arrête la musique': 'stop music', 'arrete la musique svp': 'stop music', 'éteins la radio': 'stop music',
+    'Baisse le volume de la musique': 'music quieter', 'baisse le volume de la musique': 'music quieter', 'peux-tu baisser la musique un peu': 'music quieter',
+    'Monte le volume de la musique': 'music louder', 'monte le son de la musique': 'music louder', 'mets la musique plus forte': 'music louder',
+  };
+  for (const [fr, en] of Object.entries(said)) assert.equal(frenchMusic(fr), en, fr);
+  for (const en of ['play some music', 'next station', 'stop the music']) assert.equal(frenchMusic(en), null, en);
+});
+
+test('everyday French that is not about music never starts the player', () => {
+  const { frenchMusic } = require('../../src/main/orchestrator');
+  for (const fr of ['je joue de la musique depuis dix ans', "j'aime la musique classique", 'la musique était trop forte hier soir', 'mets la table',
+    'mets un minuteur de 10 minutes', 'mets une alarme à 7 h 30', 'monte le volume', 'baisse le chauffage', 'baisse les stores', 'fais une pause', 'on prend une pause',
+    'pause café', "c'est quoi la chanson suivante", 'la station suivante est loin', 'quelle station de radio tu préfères', 'arrête de parler', 'arrête',
+    'joue avec moi', 'joue du piano', 'change de sujet', 'ouvre la porte', 'mets ma vidéo sur YouTube', 'mets ça sur YouTube', 'lance une recherche sur YouTube']) {
+    assert.equal(frenchMusic(fr), null, fr);
+  }
+});
+
+test('a French music command is handled by the player, not the brain', async () => {
+  const { Orchestrator } = require('../../src/main/orchestrator');
+  const did = [];
+  const o = Object.assign(Object.create(Orchestrator.prototype), {
+    cfg: { ...C.DEFAULTS }, progress: new Map(), finishedTurn() {}, speaker: { speak() {}, stop() {} },
+    music: { play: () => did.push('play'), stop: () => did.push('stop'), next: () => did.push('next'), nextTrack: () => did.push('track'), playSearch: async (q) => { did.push(`radio ${q}`); return q; } },
+    youtube: { playQuery: (q) => did.push(`youtube ${q}`), stop: () => did.push('youtube stop') },
+  });
+  for (const fr of ['mets de la musique', 'arrête la musique', 'pause', 'chanson suivante', 'station suivante', 'joue du lofi sur YouTube', 'ferme YouTube', 'mets la radio Mirchi']) {
+    const act = o.localIntent(fr, { kind: 'voice' });
+    assert.ok(act, fr);
+    await act();
+  }
+  assert.deepEqual(did, ['play', 'stop', 'stop', 'track', 'next', 'youtube lofi', 'youtube stop', 'radio mirchi']);
+  assert.equal(o.localIntent('mets la table', { kind: 'voice' }), null);
+});
+
 test('config sanitising replaces junk with defaults', () => {
   const c = C.sanitize({ ...C.DEFAULTS, effort: 'turbo', commandSilenceSeconds: -7, checkIns: 'always', ollamaUrl: 'ftp://x' });
   assert.equal(c.effort, C.DEFAULTS.effort);
