@@ -102,6 +102,13 @@ function frenchMusic(input) {
   return null;
 }
 
+/** Whether the user spoke French, for JARVIS's few fixed replies (the brain answers in the user's language itself). */
+function spokeFrench(text) {
+  const t = fold(String(text || '')).toLowerCase();
+  return frenchMusic(text) !== null || /[àâçéèêëîïôûùüœ]/.test(String(text || '').toLowerCase())
+    || /\b(?:je|tu|la|le|les|du|des|mets|joue|jouer|arrete|reveille|bonne|nuit|dors|merci|oui|musique|toi|chanson|toune|station suivante)\b/.test(t);
+}
+
 class Orchestrator extends EventEmitter {
   constructor({ cfg, brain, ears, audio, hud, found }) {
     super();
@@ -930,6 +937,10 @@ class Orchestrator extends EventEmitter {
 
   localIntent(c, source) {
     const t = c.toLowerCase();
+    // "réveille-toi" reaches here as "wake up": the words actually heard tell the language.
+    const fr = spokeFrench(source.kind === 'voice' && this.wake?.lastText ? this.wake.lastText : c);
+    const say = (en, frText) => this.speaker.speak(fr ? frText : en);
+    const h = this.cfg.honorific;
     if (source.kind === 'telegram' || source.kind === 'peer') return null;
     const done = () => this.finishedTurn();
     const sw = SWITCH_TO.exec(t.trim().replace(/[.!?,]+/g, ''));
@@ -953,19 +964,19 @@ class Orchestrator extends EventEmitter {
         this.hud.send('mode', { conversation: true });
         this.audio.chime();
         if (this.briefingDue()) { done(); this.briefing(); return; }
-        this.speaker.speak(`Yes, ${this.cfg.honorific}?`);
+        say(`Yes, ${h}?`, `Oui, ${h}?`);
         done();
       };
     }
     const ask = frenchMusic(t) || t;   // "mets de la musique" → "play some music"
     const yt = /^(?:play|put on|open)\s+(.+?)\s+(?:on|from)\s+youtube$/.exec(ask);
-    if (yt) return () => { this.youtube.playQuery(yt[1]); this.speaker.speak(`Playing ${yt[1]} on YouTube, ${this.cfg.honorific}.`); done(); };
+    if (yt) return () => { this.youtube.playQuery(yt[1]); say(`Playing ${yt[1]} on YouTube, ${h}.`, `Je mets ${yt[1]} sur YouTube, ${h}.`); done(); };
     if (ask.includes('stop youtube') || ask.includes('close youtube')) return () => { this.youtube.stop(); done(); };
     const rq = radioQuery(ask);
     if (rq) {
       return async () => {
         const name = await this.music.playSearch(rq);
-        this.speaker.speak(name ? `Playing ${name}, ${this.cfg.honorific}.` : `I could not find a station called ${rq}.`);
+        if (name) say(`Playing ${name}, ${h}.`, `Je mets ${name}, ${h}.`); else say(`I could not find a station called ${rq}.`, `Je ne trouve pas de station ${rq}.`);
         done();
       };
     }
@@ -986,7 +997,7 @@ class Orchestrator extends EventEmitter {
         this.pendingApproval = null;
         this.wake.setConversation(false);
         this.hud.send('mode', { conversation: false });
-        this.speaker.speak(`Going quiet, ${this.cfg.honorific}.`);
+        say(`Going quiet, ${h}.`, `Je me mets en veille, ${h}.`);
         this.state = this.muted ? 'muted' : 'idle';
       };
     }
@@ -1018,4 +1029,4 @@ class Orchestrator extends EventEmitter {
   }
 }
 
-module.exports = { Orchestrator, radioQuery, frenchMusic };
+module.exports = { Orchestrator, radioQuery, frenchMusic, spokeFrench };
