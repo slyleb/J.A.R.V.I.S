@@ -90,7 +90,12 @@ class Ears extends EventEmitter {
       this.sendCloud({ message_type: 'input_audio_chunk', audio_base_64: '', commit: true, sample_rate: 16000 });
     }
   }
-  mute(on) { this.isMuted = on; this.send({ cmd: 'mute', on }); }
+  mute(on) {
+    this.isMuted = on;
+    this.send({ cmd: 'mute', on });
+    // Muted: no audio reaches the cloud, and Scribe drops an idle stream every ~15 s, so don't keep reopening it.
+    if (on) this.closeCloud(); else if (this.cloudWanted) this.openCloud();
+  }
   armed(on) { this.send({ cmd: 'armed', on }); }
   /** Echo cancellation in the sidecar: on while JARVIS talks or music plays, off otherwise (it costs CPU). */
   echo(on) { if (this.echoOn === on) return; this.echoOn = on; log(`ears: echo cancellation ${on ? 'on' : 'off'}`); this.send({ cmd: 'echo', on }); }
@@ -121,7 +126,7 @@ class Ears extends EventEmitter {
   // ---------- ElevenLabs Scribe realtime ----------
 
   async openCloud() {
-    if (this.ws || !this.cloudWanted) return;
+    if (this.ws || !this.cloudWanted || this.isMuted) return;
     try {
       // Single-use token: the API key never goes into a URL.
       const r = await fetch('https://api.elevenlabs.io/v1/single-use-token/realtime_scribe', {

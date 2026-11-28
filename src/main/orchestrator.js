@@ -999,7 +999,7 @@ class Orchestrator extends EventEmitter {
    *  While awake everything heard may be streamed to the cloud transcriber, which costs credits. */
   idleSleepTick(now = Date.now()) {
     const limit = (this.cfg.awakeIdleSeconds || 0) * 1000;
-    if (!limit || !this.awake || this.disabled || this.muted) return false;
+    if (!limit || !this.awake || this.disabled) return false;
     // Busy, or a background job is still running (the user is waiting for its result): stay awake.
     if (['thinking', 'speaking'].includes(this._state) || this.brain.isBusy || this.speaker.isSpeaking || this.pendingCommand || this.progress?.size) return false;
     if (now - Math.max(this.lastCommandAt || 0, this.lastSpokeAt || 0) < limit) return false;
