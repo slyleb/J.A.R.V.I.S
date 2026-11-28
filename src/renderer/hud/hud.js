@@ -1744,7 +1744,10 @@
   let musicOn = false, musicId = '', musicSrc = 'radio', stations = [], musicCredit = '', ytPresets = [];
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function setMusic(m) {
+    const started = !musicOn && !!m.playing;
     musicOn = !!m.playing; musicId = m.id || musicId; musicSrc = m.source || 'radio';
+    // Music just started ("mets de la musique"): show the player, unless the user is in Settings.
+    if (started && !machine && !['music', 'settings'].includes(body.dataset.view)) showView('music');
     const name = m.name || 'Lofi Beats', title = (m.title && m.title !== name) ? m.title : '';
     $('n-music').textContent = musicOn ? ('· ' + (title || name)).slice(0, 34) : '';
     document.body.classList.toggle('music-on', musicOn);
