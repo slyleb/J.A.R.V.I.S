@@ -26,8 +26,9 @@ const { memoryEnv } = require('../memory');
 const { SentenceSplitter, systemPrompt, workerPrompt, summarise, claudeSettings, claudeExtras, claudeDisallowed } = require('./common');
 
 const ENDED = new Set(['completed', 'failed', 'killed', 'stopped', 'cancelled']);
-// A fresh brain starts at about 23k tokens (prompt, tools, worker); this leaves about 45k for the conversation.
-const ROLL_TOKENS = 70000;
+// A fresh brain starts at about 23k tokens (prompt, tools, worker); this leaves about 17k for the conversation.
+// Replies slowed from 1-2.5 s to about 5 s well before 70k, so it rolls at 40k like the API brains.
+const ROLL_TOKENS = 40000;
 const RETRY_MS = 10 * 60 * 1000;
 
 /** "Running mcp__claude-in-chrome__navigate" → "navigate in Chrome"; "Running List files" → "List files". */
